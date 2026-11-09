@@ -1,0 +1,42 @@
+#!/bin/bash
+
+if [[ $1 == "test" ]]
+then
+  PSQL="psql --username=postgres --dbname=worldcup_test -t --no-align -c"
+else
+  PSQL="psql --username=freecodecamp --dbname=worldcup -t --no-align -c"
+fi
+
+# Clear existing tables so you don't get duplicates if you run it multiple times
+echo $($PSQL "TRUNCATE TABLE games, teams;")
+
+# Read games.csv skipping the header
+cat games.csv | while IFS="," read YEAR ROUND WINNER OPPONENT WINNER_GOALS OPPONENT_GOALS
+do
+  # Skip the header row
+  if [[ $YEAR != "year" ]]
+  then
+    # 1. Get winner_id from teams table
+    WINNER_ID=$($PSQL "SELECT team_id FROM teams WHERE name='$WINNER';")
+
+    # If winner team doesn't exist yet, insert it
+    if [[ -z $WINNER_ID ]]
+    then
+      $PSQL "INSERT INTO teams(name) VALUES('$WINNER');"
+      WINNER_ID=$($PSQL "SELECT team_id FROM teams WHERE name='$WINNER';")
+    fi
+
+    # 2. Get opponent_id from teams table
+    OPPONENT_ID=$($PSQL "SELECT team_id FROM teams WHERE name='$OPPONENT';")
+
+    # If opponent team doesn't exist yet, insert it
+    if [[ -z $OPPONENT_ID ]]
+    then
+      $PSQL "INSERT INTO teams(name) VALUES('$OPPONENT');"
+      OPPONENT_ID=$($PSQL "SELECT team_id FROM teams WHERE name='$OPPONENT';")
+    fi
+
+    # 3. Insert the game row into the games table
+    $PSQL "INSERT INTO games(year, round, winner_id, opponent_id, winner_goals, opponent_goals) VALUES($YEAR, '$ROUND', $WINNER_ID, $OPPONENT_ID, $WINNER_GOALS, $OPPONENT_GOALS);"
+  fi
+done
